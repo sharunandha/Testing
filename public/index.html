@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EnvoScience – Disaster Risk Analytics</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #ecfdf5;
+      --card: #ffffff;
+      --card-green: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      --border: #a7f3d0;
+      --border-strong: #34d399;
+      --text: #064e3b;
+      --text-muted: #047857;
+      --primary: #059669;
+      --primary-dark: #047857;
+      --low: #10b981;
+      --medium: #f59e0b;
+      --high: #ef4444;
+      --shadow: 0 4px 14px rgba(5,150,105,0.12);
+      --shadow-card: 0 2px 12px rgba(6,78,59,0.08);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --sidebar-w: 280px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);
+      background-image:radial-gradient(circle at 20% 80%,rgba(167,243,208,.45) 0%,transparent 50%),radial-gradient(circle at 80% 20%,rgba(16,185,129,.2) 0%,transparent 45%);}
+
+    /* ── Header ── */
+    .header{background:linear-gradient(135deg,#047857 0%,#059669 50%,#0d9488 100%);padding:.85rem 1.4rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem;box-shadow:0 4px 20px rgba(4,120,87,.35);position:sticky;top:0;z-index:200;}
+    .header-left{display:flex;align-items:center;gap:.75rem;}
+    .menu-btn{width:42px;height:42px;border-radius:12px;border:2px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+    .menu-btn:hover{background:rgba(255,255,255,.3);}
+    .header h1{font-size:1.2rem;font-weight:800;color:#fff;letter-spacing:-.02em;}
+    .header .tagline{font-size:.76rem;color:rgba(255,255,255,.85);margin-top:.1rem;}
+    .filters{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;}
+    .filters label{font-size:.82rem;color:rgba(255,255,255,.9);}
+    .filters select{padding:.45rem .75rem;border:2px solid rgba(255,255,255,.35);border-radius:var(--radius-sm);background:rgba(255,255,255,.95);color:var(--text);font-size:.85rem;font-weight:500;}
+    .btn{padding:.5rem .9rem;border:none;border-radius:var(--radius-sm);font-size:.82rem;font-weight:600;cursor:pointer;background:#fff;color:var(--primary);transition:transform .15s,box-shadow .15s;}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15);}
+    .btn.secondary{background:rgba(255,255,255,.2);color:#fff;border:2px solid rgba(255,255,255,.5);}
+    .btn.secondary:hover{background:rgba(255,255,255,.3);}
+    .refresh-msg{font-size:.75rem;color:rgba(255,255,255,.8);}
+
+    /* ── Sidebar ── */
+    .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;opacity:0;pointer-events:none;transition:opacity .25s;}
+    .sidebar-overlay.open{opacity:1;pointer-events:auto;}
+    .sidebar{position:fixed;top:0;left:calc(-1*var(--sidebar-w) - 10px);width:var(--sidebar-w);height:100vh;background:#fff;z-index:350;box-shadow:4px 0 24px rgba(0,0,0,.15);transition:left .3s ease;display:flex;flex-direction:column;}
+    .sidebar.open{left:0;}
+    .sidebar-header{padding:1.1rem 1.25rem;background:linear-gradient(135deg,#047857,#059669);display:flex;align-items:center;justify-content:space-between;color:#fff;}
+    .sidebar-header h2{font-size:1rem;font-weight:700;}
+    .sidebar-close{background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;}
+    .sidebar-nav{list-style:none;flex:1;overflow-y:auto;padding:.5rem 0;}
+    .sidebar-nav li{padding:.85rem 1.25rem;cursor:pointer;font-size:.9rem;font-weight:600;display:flex;align-items:center;gap:.7rem;color:var(--text);border-left:4px solid transparent;transition:all .2s;}
+    .sidebar-nav li:hover{background:#ecfdf5;border-left-color:var(--primary);color:var(--primary);}
+    .sidebar-nav li.active{background:#d1fae5;border-left-color:var(--primary-dark);color:var(--primary-dark);}
+    .sidebar-nav li i{width:20px;text-align:center;font-size:1rem;}
+
+    /* ── Main ── */
+    .container{max-width:1400px;margin:0 auto;padding:1.25rem 1.5rem;}
+    .page{display:none;} .page.active{display:block;}
+
+    .card{background:var(--card);border:2px solid var(--border);border-radius:var(--radius);padding:1.35rem;box-shadow:var(--shadow-card);transition:box-shadow .2s,border-color .2s;}
+    .card:hover{border-color:var(--border-strong);box-shadow:var(--shadow);}
+    .card h2{font-size:1rem;font-weight:700;margin:0 0 .75rem 0;display:flex;align-items:center;gap:.5rem;}
+    .card h2 i{color:var(--primary);}
+    .grid{display:grid;gap:1rem;}
+
+    /* KPI */
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem;}
+    @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+    @media(max-width:500px){.kpi-grid{grid-template-columns:1fr;}}
+    .kpi{padding:1rem 1.1rem;border-radius:var(--radius-sm);background:var(--card-green);border:2px solid var(--border);display:flex;align-items:flex-start;gap:.75rem;}
+    .kpi .kpi-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex-shrink:0;}
+    .kpi.kpi-dams .kpi-icon{background:linear-gradient(135deg,#a7f3d0,#6ee7b7);color:var(--primary-dark);}
+    .kpi.kpi-flood .kpi-icon{background:linear-gradient(135deg,#a5f3fc,#67e8f9);color:#0e7490;}
+    .kpi.kpi-land .kpi-icon{background:linear-gradient(135deg,#fde68a,#fcd34d);color:#b45309;}
+    .kpi.kpi-zones .kpi-icon{background:linear-gradient(135deg,#fecaca,#fca5a5);color:#b91c1c;}
+    .kpi .value{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;}
+    .kpi .label{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem;font-weight:600;}
+    .level-low{color:var(--low);font-weight:600;}
+    .level-medium{color:var(--medium);font-weight:600;}
+    .level-high{color:var(--high);font-weight:600;}
+
+    /* Nowcast */
+    .nowcast-panel{border:3px solid var(--border);border-radius:var(--radius);background:var(--card);padding:1.25rem;overflow:hidden;}
+    .nowcast-panel.alert-LOW{border-color:var(--low);}
+    .nowcast-panel.alert-MEDIUM{border-color:var(--medium);background:linear-gradient(135deg,#fffbeb,#fef3c7);}
+    .nowcast-panel.alert-HIGH{border-color:var(--high);background:linear-gradient(135deg,#fef2f2,#fee2e2);animation:pulse-border 2s ease-in-out infinite;}
+    @keyframes pulse-border{0%,100%{border-color:var(--high);}50%{border-color:#fca5a5;}}
+    .nowcast-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem;flex-wrap:wrap;}
+    .nowcast-header .nowcast-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#fff;}
+    .nowcast-panel.alert-LOW .nowcast-icon{background:var(--low);}
+    .nowcast-panel.alert-MEDIUM .nowcast-icon{background:var(--medium);}
+    .nowcast-panel.alert-HIGH .nowcast-icon{background:var(--high);}
+    .nowcast-header h2{margin:0;font-size:1.05rem;font-weight:700;}
+    .alert-badge{padding:.25rem .75rem;border-radius:20px;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+    .alert-badge.LOW{background:#d1fae5;color:#065f46;}
+    .alert-badge.MEDIUM{background:#fef3c7;color:#92400e;}
+    .alert-badge.HIGH{background:#fee2e2;color:#991b1b;}
+    .nowcast-stats{display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:.75rem;}
+    .nowcast-stat{font-size:.875rem;}
+    .nowcast-stat .val{font-weight:800;font-size:1.1rem;}
+    .nowcast-dam-list{max-height:340px;overflow-y:auto;}
+    .nowcast-dam-list table{font-size:.82rem;}
+    .nowcast-dam-list th{position:sticky;top:0;z-index:1;}
+    .nowcast-countdown{font-size:.78rem;color:var(--text-muted);}
+
+    /* Map */
+    #map{height:440px;border-radius:var(--radius-sm);border:2px solid var(--border);overflow:hidden;position:relative;z-index:1;}
+    .leaflet-container{z-index:1!important;}
+    .map-card{position:relative;z-index:1;overflow:hidden;}
+
+    /* Table */
+    table{width:100%;border-collapse:collapse;font-size:.875rem;}
+    th,td{padding:.6rem .85rem;text-align:left;border-bottom:1px solid var(--border);}
+    th{background:var(--card-green);color:var(--text-muted);font-weight:700;}
+    tr:hover{background:rgba(167,243,208,.25);}
+
+    /* Zones */
+    .zone-list{list-style:none;}
+    .zone-list li{padding:.6rem .85rem;margin-bottom:.35rem;border-radius:var(--radius-sm);background:var(--card-green);border:2px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:.5rem;}
+    .zone-list li.high{border-left:5px solid var(--high);}
+    .zone-list li.medium{border-left:5px solid var(--medium);}
+
+    .loading{text-align:center;padding:1.5rem;color:var(--text-muted);}
+    .error{color:var(--high);font-size:.875rem;}
+    .data-note{font-size:.8rem;color:var(--text-muted);margin:0 0 .5rem 0;}
+
+    /* Chart sections */
+    .chart-state-section{margin-bottom:1.5rem;}
+    .chart-state-section h3{font-size:.95rem;font-weight:700;margin:0 0 .5rem 0;display:flex;align-items:center;gap:.4rem;}
+    .chart-state-section h3 i{color:var(--primary);}
+    .chart-canvas-wrap{background:var(--card);border:2px solid var(--border);border-radius:var(--radius-sm);padding:1rem;}
+
+    /* Zone sections */
+    .zone-section-label{font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:.5rem .85rem;margin:.6rem 0 .3rem 0;border-radius:var(--radius-sm);display:flex;align-items:center;gap:.4rem;}
+    .zone-section-label.high-label{background:#fee2e2;color:#991b1b;}
+    .zone-section-label.medium-label{background:#fef3c7;color:#92400e;}
+    .zone-empty{font-size:.85rem;color:var(--text-muted);padding:.5rem .85rem;font-style:italic;}
+
+    /* ── Mobile responsive ── */
+    @media(max-width:768px){
+      .header{padding:.65rem 1rem;}
+      .header h1{font-size:1rem;}
+      .header .tagline{font-size:.68rem;}
+      .filters{width:100%;justify-content:flex-start;}
+      .filters select{flex:1;min-width:0;}
+      .container{padding:.75rem .85rem;}
+      .grid[style*='2fr 1fr']{grid-template-columns:1fr!important;}
+      #map{height:300px;}
+      .kpi-grid{grid-template-columns:repeat(2,1fr);gap:.65rem;}
+      .kpi{padding:.75rem .85rem;}
+      .kpi .value{font-size:1.3rem;}
+      .nowcast-dam-list{max-height:260px;}
+      .nowcast-dam-list table{font-size:.75rem;}
+      .nowcast-dam-list th,
+      .nowcast-dam-list td{padding:.4rem .5rem;}
+      .card{padding:1rem;}
+      .card h2{font-size:.92rem;}
+      table{font-size:.78rem;}
+      th,td{padding:.45rem .55rem;}
+      .sidebar{width:260px;}
+    }
+    @media(max-width:400px){
+      .kpi-grid{grid-template-columns:1fr;}
+      .header-left{flex-wrap:wrap;}
+      .nowcast-stats{flex-direction:column;gap:.4rem;}
+    }
+
+    /* Scrollable table wrapper */
+    .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar overlay -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2><i class="fas fa-leaf"></i> Menu</h2>
+      <button class="sidebar-close" id="sidebarClose"><i class="fas fa-xmark"></i></button>
+    </div>
+    <ul class="sidebar-nav" id="sidebarNav">
+      <li data-page="home" class="active"><i class="fas fa-house"></i> Home Dashboard</li>
+      <li data-page="map"><i class="fas fa-map-location-dot"></i> Map &amp; Risk Zones</li>
+      <li data-page="damtable"><i class="fas fa-table-list"></i> Dam Monitor Table</li>
+      <li data-page="rainfall"><i class="fas fa-cloud-rain"></i> Rainfall Prediction</li>
+      <li data-page="floodland"><i class="fas fa-chart-bar"></i> Flood vs Landslide</li>
+    </ul>
+  </nav>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <button class="menu-btn" id="menuBtn"><i class="fas fa-bars"></i></button>
+      <div>
+        <h1>EnvoScience – Disaster Risk Analytics</h1>
+        <div class="tagline"><i class="fas fa-droplet"></i> Real-time flood &amp; landslide prediction · India dams</div>
+      </div>
+    </div>
+    <div class="filters">
+      <label><i class="fas fa-filter"></i> State</label>
+      <select id="stateFilter"><option value="">All India</option></select>
+      <button class="btn" id="btnRefresh"><i class="fas fa-arrows-rotate"></i> Refresh</button>
+      <button class="btn secondary" id="btnRunCheck"><i class="fas fa-play"></i> Run check</button>
+      <span class="refresh-msg" id="lastUpdate">—</span>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- ═══ PAGE: Home ═══ -->
+    <div class="page active" id="pageHome">
+      <div class="kpi-grid">
+        <div class="kpi kpi-dams"><div class="kpi-icon"><i class="fas fa-water"></i></div><div><span class="value" id="kpiDams">—</span><div class="label">Dams monitored</div></div></div>
+        <div class="kpi kpi-flood"><div class="kpi-icon"><i class="fas fa-droplet"></i></div><div><span class="value" id="kpiFlood">—</span><div class="label">Flood risk (avg)</div></div></div>
+        <div class="kpi kpi-land"><div class="kpi-icon"><i class="fas fa-mountain-sun"></i></div><div><span class="value" id="kpiLandslide">—</span><div class="label">Landslide risk (avg)</div></div></div>
+        <div class="kpi kpi-zones"><div class="kpi-icon"><i class="fas fa-triangle-exclamation"></i></div><div><span class="value level-high" id="kpiZones">—</span><div class="label">High-risk zones</div></div></div>
+      </div>
+      <div class="nowcast-panel alert-LOW" id="nowcastPanel">
+        <div class="nowcast-header">
+          <div class="nowcast-icon"><i class="fas fa-clock"></i></div>
+          <h2><i class="fas fa-bolt"></i> 1-Hour Nowcast Early Warning</h2>
+          <span class="alert-badge LOW" id="nowcastBadge">LOW</span>
+          <span class="nowcast-countdown" id="nowcastCountdown">Next refresh in 60s</span>
+        </div>
+        <div class="nowcast-stats">
+          <div class="nowcast-stat">Warnings: <span class="val" id="ncWarnings">0</span></div>
+          <div class="nowcast-stat">Emergencies: <span class="val level-high" id="ncEmergencies">0</span></div>
+          <div class="nowcast-stat">Dams checked: <span class="val" id="ncDamsCount">—</span></div>
+        </div>
+        <div class="nowcast-dam-list" id="nowcastDamList"><p class="loading">Initializing nowcast…</p></div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: Map & Risk Zones ═══ -->
+    <div class="page" id="pageMap">
+      <div class="grid" style="grid-template-columns:2fr 1fr;">
+        <div class="card map-card">
+          <h2><i class="fas fa-map-location-dot"></i> India Map – Dams &amp; Risk Zones</h2>
+          <div id="map"></div>
+        </div>
+        <div class="card">
+          <h2><i class="fas fa-list-check"></i> Risk Zones</h2>
+          <div id="zoneListWrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: Dam Table ═══ -->
+    <div class="page" id="pageDamtable">
+      <div class="card">
+        <h2><i class="fas fa-table-list"></i> State-wise Dam Monitor</h2>
+        <div id="damTableWrap"><p class="loading">Loading…</p></div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: Rainfall Prediction ═══ -->
+    <div class="page" id="pageRainfall">
+      <div class="card">
+        <h2><i class="fas fa-cloud-rain"></i> Rainfall Prediction – Dam-wise by State</h2>
+        <p class="data-note">Current 24h rainfall vs predicted next 7-day average (mm) for every dam, grouped by state.</p>
+        <div id="rainfallChartsWrap"><p class="loading">Loading charts…</p></div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: Flood vs Landslide ═══ -->
+    <div class="page" id="pageFloodland">
+      <div class="card">
+        <h2><i class="fas fa-chart-bar"></i> Flood vs Landslide Risk – Dam-wise by State</h2>
+        <p class="data-note">Per-dam flood and landslide risk scores (0–100) grouped by state.</p>
+        <div id="floodLandChartsWrap"><p class="loading">Loading charts…</p></div>
+      </div>
+    </div>
+
+
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const API = window.location.origin;
+    let map = null, markers = [];
+    let rainfallCharts = [], floodLandCharts = [];
+    let analyticsCache = null;
+
+    function el(id) { return document.getElementById(id); }
+
+    async function api(path, opts = {}) {
+      const r = await fetch(API + path, opts);
+      const j = await r.json();
+      if (!j.success && j.error) throw new Error(j.error);
+      return j.data;
+    }
+
+    function setLastUpdate(t) {
+      el('lastUpdate').textContent = t ? 'Updated ' + new Date(t).toLocaleString() : '—';
+    }
+
+    function riskClass(level) {
+      const L = String(level || '').toUpperCase();
+      return L === 'HIGH' ? 'level-high' : L === 'MEDIUM' ? 'level-medium' : 'level-low';
+    }
+
+    /* ── Sidebar ── */
+    function openSidebar()  { el('sidebar').classList.add('open'); el('sidebarOverlay').classList.add('open'); }
+    function closeSidebar() { el('sidebar').classList.remove('open'); el('sidebarOverlay').classList.remove('open'); }
+
+    function navigateTo(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const target = document.getElementById('page' + pageId.charAt(0).toUpperCase() + pageId.slice(1));
+      if (target) target.classList.add('active');
+      document.querySelectorAll('#sidebarNav li').forEach(li => li.classList.toggle('active', li.dataset.page === pageId));
+      closeSidebar();
+      // lazy-load content
+      if (pageId === 'map') { if (!map) initMap(); else setTimeout(() => map.invalidateSize(), 100); renderMapData(); }
+      if (pageId === 'damtable') renderDamTable(analyticsCache?.dams || []);
+      if (pageId === 'rainfall') renderRainfallCharts(analyticsCache?.dams || []);
+      if (pageId === 'floodland') renderFloodLandCharts(analyticsCache?.dams || []);
+    }
+
+    el('menuBtn').addEventListener('click', openSidebar);
+    el('sidebarClose').addEventListener('click', closeSidebar);
+    el('sidebarOverlay').addEventListener('click', closeSidebar);
+    document.querySelectorAll('#sidebarNav li').forEach(li => li.addEventListener('click', () => navigateTo(li.dataset.page)));
+
+    /* ── States ── */
+    async function loadStates() {
+      const data = await api('/api/states');
+      const sel = el('stateFilter');
+      sel.innerHTML = '<option value="">All India</option>';
+      (data.states || []).forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+    }
+
+    /* ── Analytics (central data) ── */
+    async function loadAnalytics() {
+      const state = el('stateFilter').value || '';
+      const q = state ? '?state=' + encodeURIComponent(state) : '';
+      const data = await api('/api/analytics' + q);
+      analyticsCache = data;
+      const dams = data.dams || [];
+      const zones = data.high_risk_zones || [];
+
+      el('kpiDams').textContent = dams.length;
+      const floodAvg = dams.length ? Math.round(dams.reduce((a, d) => a + (d.flood_risk_score || 0), 0) / dams.length) : 0;
+      const landAvg  = dams.length ? Math.round(dams.reduce((a, d) => a + (d.landslide_risk_score || 0), 0) / dams.length) : 0;
+      el('kpiFlood').textContent = floodAvg + '%';
+      el('kpiFlood').className = 'value ' + riskClass(floodAvg > 66 ? 'HIGH' : floodAvg > 33 ? 'MEDIUM' : 'LOW');
+      el('kpiLandslide').textContent = landAvg + '%';
+      el('kpiLandslide').className = 'value ' + riskClass(landAvg > 66 ? 'HIGH' : landAvg > 33 ? 'MEDIUM' : 'LOW');
+      el('kpiZones').textContent = zones.length;
+
+      // update whichever sub-page is visible
+      const active = document.querySelector('.page.active')?.id;
+      if (active === 'pageMap') renderMapData();
+      if (active === 'pageDamtable') renderDamTable(dams);
+      if (active === 'pageRainfall') renderRainfallCharts(dams);
+      if (active === 'pageFloodland') renderFloodLandCharts(dams);
+
+      setLastUpdate(data.timestamp);
+    }
+
+    /* ── Zone list (separate HIGH and MEDIUM) ── */
+    function renderZoneList(zones) {
+      const wrap = el('zoneListWrap');
+      const highZones = zones.filter(z => z.zone_severity === 'HIGH');
+      const medZones = zones.filter(z => z.zone_severity === 'MEDIUM');
+
+      let html = '';
+
+      // HIGH section
+      html += '<div class="zone-section-label high-label"><i class="fas fa-circle-exclamation"></i> High Risk Dams</div>';
+      if (highZones.length) {
+        html += '<ul class="zone-list">' + highZones.map(z =>
+          '<li class="high"><span><strong>' + z.dam + '</strong> <small style="opacity:.7;">(' + z.state + ')</small></span><span>F: ' + z.flood_risk + '% (' + z.flood_level + ') &nbsp; L: ' + z.landslide_risk + '% (' + z.landslide_level + ')</span></li>'
+        ).join('') + '</ul>';
+      } else {
+        html += '<p class="zone-empty"><i class="fas fa-circle-check" style="color:var(--low);"></i> No high-risk dams</p>';
+      }
+
+      // MEDIUM section
+      html += '<div class="zone-section-label medium-label"><i class="fas fa-triangle-exclamation"></i> Medium Risk Dams</div>';
+      if (medZones.length) {
+        html += '<ul class="zone-list">' + medZones.map(z =>
+          '<li class="medium"><span><strong>' + z.dam + '</strong> <small style="opacity:.7;">(' + z.state + ')</small></span><span>F: ' + z.flood_risk + '% (' + z.flood_level + ') &nbsp; L: ' + z.landslide_risk + '% (' + z.landslide_level + ')</span></li>'
+        ).join('') + '</ul>';
+      } else {
+        html += '<p class="zone-empty"><i class="fas fa-circle-check" style="color:var(--low);"></i> No medium-risk dams</p>';
+      }
+
+      wrap.innerHTML = html;
+    }
+
+    /* ── Map ── */
+    function initMap() {
+      map = L.map('map').setView([20.5, 78.9], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' }).addTo(map);
+    }
+
+    function renderMapData() {
+      if (!analyticsCache) return;
+      const dams = analyticsCache.dams || [];
+      const zones = analyticsCache.high_risk_zones || [];
+      renderZoneList(zones);
+      if (!map) return;
+      markers.forEach(m => map.removeLayer(m)); markers = [];
+      dams.forEach(d => {
+        const lv = (d.flood_risk_level === 'HIGH' || d.landslide_risk_level === 'HIGH') ? 'high' : (d.flood_risk_level === 'MEDIUM' || d.landslide_risk_level === 'MEDIUM') ? 'medium' : 'low';
+        const cl = lv === 'high' ? '#ef4444' : lv === 'medium' ? '#f59e0b' : '#10b981';
+        const ic = L.divIcon({ className:'dam-marker', html:'<span style="background:'+cl+';width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);"></span>', iconSize:[16,16] });
+        const m = L.marker([d.lat, d.lon], { icon: ic })
+          .bindPopup('<b>'+d.name+'</b><br/>State: '+d.state+'<br/>River: '+(d.river||'—')+'<br/>Rain 24h: '+fmtRain(d.rainfall_24h_mm)+' mm<br/>Flood: '+d.flood_risk_score+'% ('+d.flood_risk_level+') &nbsp; Landslide: '+d.landslide_risk_score+'% ('+d.landslide_risk_level+')')
+          .addTo(map);
+        markers.push(m);
+      });
+      setTimeout(() => map.invalidateSize(), 150);
+    }
+
+    /* ── Helpers for display ── */
+    function fmtRain(v) { return v != null ? v.toFixed(1) : '—'; }
+
+    /* ── Dam Table ── */
+    function renderDamTable(dams) {
+      const w = el('damTableWrap');
+      if (!dams.length) { w.innerHTML = '<p class="loading">No dams in selected state.</p>'; return; }
+      w.innerHTML = '<div class="table-scroll"><table><thead><tr><th>Dam</th><th>State</th><th>River</th><th>Rain 24h (mm)</th><th>Pred 7d avg</th><th>Flood</th><th>Landslide</th></tr></thead><tbody>' +
+        dams.map(d => '<tr><td><strong>'+d.name+'</strong></td><td>'+d.state+'</td><td>'+(d.river||'—')+'</td><td>'+fmtRain(d.rainfall_24h_mm)+'</td><td>'+fmtRain(d.predicted_avg_rainfall_7d_mm)+'</td><td><span class="'+riskClass(d.flood_risk_level)+'">'+d.flood_risk_score+'% ('+d.flood_risk_level+')</span></td><td><span class="'+riskClass(d.landslide_risk_level)+'">'+d.landslide_risk_score+'% ('+d.landslide_risk_level+')</span></td></tr>').join('') +
+        '</tbody></table></div>';
+    }
+
+    /* ── Rainfall charts – per dam, grouped by state ── */
+    function renderRainfallCharts(dams) {
+      rainfallCharts.forEach(c => c.destroy()); rainfallCharts = [];
+      const wrap = el('rainfallChartsWrap');
+      if (!dams.length) { wrap.innerHTML = '<p class="loading">No data.</p>'; return; }
+      const byState = {};
+      dams.forEach(d => (byState[d.state] = byState[d.state] || []).push(d));
+      const states = Object.keys(byState).sort();
+
+      wrap.innerHTML = states.map(s =>
+        '<div class="chart-state-section"><h3><i class="fas fa-cloud-rain"></i> ' + s + '</h3>' +
+        '<div class="chart-canvas-wrap"><canvas id="rc_' + s.replace(/\s/g,'_') + '" height="200"></canvas></div></div>'
+      ).join('');
+
+      states.forEach(s => {
+        const sd = byState[s];
+        const labels = sd.map(d => d.name.length > 20 ? d.name.slice(0,18)+'…' : d.name);
+        const ctx = document.getElementById('rc_' + s.replace(/\s/g,'_'));
+        if (!ctx) return;
+        rainfallCharts.push(new Chart(ctx.getContext('2d'), {
+          type: 'bar',
+          data: { labels, datasets: [
+            { label: 'Rainfall 24h (mm)', data: sd.map(d => d.rainfall_24h_mm ?? 0), backgroundColor: 'rgba(16,185,129,.8)' },
+            { label: 'Predicted avg 7d (mm)', data: sd.map(d => d.predicted_avg_rainfall_7d_mm ?? 0), backgroundColor: 'rgba(13,148,136,.8)' }
+          ]},
+          options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { x: { ticks: { maxRotation: 45 } } } }
+        }));
+      });
+    }
+
+    /* ── Flood vs Landslide charts – per dam, grouped by state ── */
+    function renderFloodLandCharts(dams) {
+      floodLandCharts.forEach(c => c.destroy()); floodLandCharts = [];
+      const wrap = el('floodLandChartsWrap');
+      if (!dams.length) { wrap.innerHTML = '<p class="loading">No data.</p>'; return; }
+      const byState = {};
+      dams.forEach(d => (byState[d.state] = byState[d.state] || []).push(d));
+      const states = Object.keys(byState).sort();
+
+      wrap.innerHTML = states.map(s =>
+        '<div class="chart-state-section"><h3><i class="fas fa-chart-bar"></i> ' + s + '</h3>' +
+        '<div class="chart-canvas-wrap"><canvas id="fl_' + s.replace(/\s/g,'_') + '" height="200"></canvas></div></div>'
+      ).join('');
+
+      states.forEach(s => {
+        const sd = byState[s];
+        const labels = sd.map(d => d.name.length > 20 ? d.name.slice(0,18)+'…' : d.name);
+        const ctx = document.getElementById('fl_' + s.replace(/\s/g,'_'));
+        if (!ctx) return;
+        floodLandCharts.push(new Chart(ctx.getContext('2d'), {
+          type: 'bar',
+          data: { labels, datasets: [
+            { label: 'Flood risk', data: sd.map(d => d.flood_risk_score ?? 0), backgroundColor: 'rgba(13,148,136,.75)' },
+            { label: 'Landslide risk', data: sd.map(d => d.landslide_risk_score ?? 0), backgroundColor: 'rgba(245,158,11,.75)' }
+          ]},
+          options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { x: { ticks: { maxRotation: 45 } }, y: { max: 100 } } }
+        }));
+      });
+    }
+
+    /* ── 1-Hour Nowcast ── */
+    let nowcastTimer = null, nowcastSecondsLeft = 60;
+
+    function startNowcastCountdown() {
+      if (nowcastTimer) clearInterval(nowcastTimer);
+      nowcastSecondsLeft = 60;
+      nowcastTimer = setInterval(() => {
+        nowcastSecondsLeft--;
+        el('nowcastCountdown').textContent = 'Next refresh in ' + nowcastSecondsLeft + 's';
+        if (nowcastSecondsLeft <= 0) { clearInterval(nowcastTimer); loadNowcast(); }
+      }, 1000);
+    }
+
+    async function loadNowcast() {
+      const state = el('stateFilter').value || '';
+      const q = state ? '?state=' + encodeURIComponent(state) : '';
+      try {
+        const data = await api('/api/nowcast/1h' + q);
+        const level = data.alert_level_1h || 'LOW';
+        el('nowcastPanel').className = 'nowcast-panel alert-' + level;
+        el('nowcastBadge').className = 'alert-badge ' + level;
+        el('nowcastBadge').textContent = level;
+        el('ncWarnings').textContent = data.warning_count || 0;
+        el('ncEmergencies').textContent = data.emergency_count || 0;
+        el('ncDamsCount').textContent = (data.dams || []).length;
+
+        const dams = data.dams || [];
+        const listEl = el('nowcastDamList');
+        if (!dams.length) { listEl.innerHTML = '<p style="text-align:center;color:var(--text-muted);">No dams to evaluate.</p>'; }
+        else {
+          listEl.innerHTML = '<table><thead><tr><th>Dam</th><th>State</th><th>Flood 1h</th><th>Landslide 1h</th><th>Overall</th><th>Status</th></tr></thead><tbody>' +
+            dams.map(d => {
+              const st = d.emergency_triggered ? '<span style="color:var(--high);font-weight:700;"><i class="fas fa-circle-exclamation"></i> EMERGENCY</span>' :
+                d.warning_triggered ? '<span style="color:var(--medium);font-weight:700;"><i class="fas fa-triangle-exclamation"></i> WARNING</span>' :
+                '<span style="color:var(--low);"><i class="fas fa-circle-check"></i> OK</span>';
+              return '<tr><td><strong>' + d.name + '</strong></td><td>' + d.state + '</td>' +
+                '<td><span class="' + riskClass(d.risk_level_1h) + '">' + d.flood_score_1h + '%</span></td>' +
+                '<td><span class="' + riskClass(d.risk_level_1h) + '">' + d.landslide_score_1h + '%</span></td>' +
+                '<td><span class="' + riskClass(d.risk_level_1h) + '">' + d.overall_score_1h + '% (' + d.risk_level_1h + ')</span></td>' +
+                '<td>' + st + '</td></tr>';
+            }).join('') + '</tbody></table>';
+        }
+      } catch (e) { el('nowcastDamList').innerHTML = '<p class="error">' + e.message + '</p>'; }
+      startNowcastCountdown();
+    }
+
+    /* ── Quick stats ── */
+    async function loadQuickStats() {
+      try {
+        const dams = await api('/api/dams');
+        const cnt = dams?.count ?? dams?.dams?.length ?? 0;
+        if (cnt) el('kpiDams').textContent = cnt;
+      } catch (e) {}
+    }
+
+    /* ── Refresh ── */
+    async function refresh() {
+      try {
+        await loadQuickStats();
+        loadNowcast();
+        await loadAnalytics();
+      } catch (e) { console.error('Refresh error:', e); }
+    }
+
+    el('stateFilter').addEventListener('change', refresh);
+    el('btnRefresh').addEventListener('click', refresh);
+    el('btnRunCheck').addEventListener('click', async () => { await api('/api/run-check', { method: 'POST' }); await refresh(); });
+
+    loadStates().then(() => refresh());
+    setInterval(refresh, 5 * 60 * 1000);
+  </script>
+</body>
+</html>

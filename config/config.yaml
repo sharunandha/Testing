@@ -1,0 +1,139 @@
+# Environmental Monitoring & Disaster Risk Analytics - Config
+# Same pattern as India-specific-tsunami-early-warning-system
+
+apis:
+  open_meteo:
+    base_url: "https://api.open-meteo.com/v1/forecast"
+    hourly_variables: "precipitation,rain,precipitation_probability"
+    past_days: 1
+    forecast_days: 3
+    parallel_requests: 10
+
+  nasa_power:
+    base_url: "https://power.larc.nasa.gov/api/temporal/daily/point"
+    parameters: "PRECTOTCORR"
+    enabled: true
+    # Baseline: compare current rain to recent 30-day average (cached 24h)
+
+  open_elevation:
+    base_url: "https://api.open-elevation.com/api/v1/lookup"
+    enabled: true
+
+  open_weather:
+    # Optional second rain source. Get free key at https://openweathermap.org/api
+    api_key: ""
+    enabled: false
+
+  usgs_earthquake:
+    base_url: "https://earthquake.usgs.gov/fdsnws/event/1/query"
+    format: "geojson"
+    min_magnitude: 4.0
+    lookback_hours: 72
+    region:
+      min_latitude: 6.0
+      max_latitude: 36.0
+      min_longitude: 68.0
+      max_longitude: 98.0
+
+  reservoir:
+    # Generic fallback reservoir API (open data format)
+    base_url: ""
+    enabled: false
+    timeout_ms: 12000
+    # Optional auth and mapping
+    api_key: ""
+    api_key_header: "x-api-key"
+    query_params: {}
+    field_mappings:
+      name: "name"
+      level_pct: "level_pct"
+      capacity: "capacity"
+      status: "status"
+      state: "state"
+      inflow: "inflow"
+      outflow: "outflow"
+      storage: "storage"
+      updated_at: "updated_at"
+
+  nwdp:
+    # National Water Data Portal / India-WRIS compatible endpoint
+    # Example: https://nwdp.nwic.gov.in/.... (set exact endpoint after registration)
+    base_url: "https://nwdp.nwic.gov.in/api/3/action/package_search"
+    enabled: true
+    mode: "ckan_auto"
+    ckan_base_url: "https://nwdp.nwic.gov.in"
+    search_query: "reservoir water level"
+    search_rows: 80
+    max_resources: 60
+    parallel_requests: 12
+    cache_ttl_ms: 900000
+    timeout_ms: 12000
+    # Some endpoints may require key/token
+    api_key: ""
+    api_key_header: "x-api-key"
+    # Optional extra headers/query params as needed by endpoint documentation
+    headers: {}
+    query_params: {}
+    # Map NWDP field names to normalized fields used in this project
+    field_mappings:
+      name: "name"
+      level_pct: "level_pct"
+      capacity: "capacity"
+      status: "status"
+      state: "state"
+      inflow: "inflow"
+      outflow: "outflow"
+      storage: "storage"
+      updated_at: "updated_at"
+
+# India bounding box for map and data
+region:
+  india:
+    min_lat: 6.0
+    max_lat: 36.0
+    min_lon: 68.0
+    max_lon: 98.0
+
+# Sample locations for rainfall (cities / dam regions)
+locations:
+  - name: "Chennai"
+    lat: 13.0827
+    lon: 80.2707
+  - name: "Mumbai"
+    lat: 19.0760
+    lon: 72.8777
+  - name: "Kolkata"
+    lat: 22.5726
+    lon: 88.3639
+  - name: "Guwahati"
+    lat: 26.1445
+    lon: 91.7362
+
+# Risk scoring (0-100) -> Low / Medium / High (same idea as tsunami thresholds)
+risk:
+  flood:
+    low_max: 33
+    medium_max: 66
+    high_max: 100
+  landslide:
+    low_max: 33
+    medium_max: 66
+    high_max: 100
+  combined_weights:
+    rainfall: 0.5
+    reservoir: 0.2
+    seismic: 0.3
+  # Optional: tune from historical events (EM-DAT / national records). Uncomment and adjust.
+  # calibration:
+  #   flood_multiplier: 1.0
+  #   landslide_multiplier: 1.0
+  #   baseline_rain_weight: 0.15
+  nowcast:
+    warning_threshold: 60
+    emergency_threshold: 75
+    rising_checks: 3
+    refresh_seconds: 60
+
+# Monitoring (same as tsunami repo)
+monitoring:
+  default_interval_seconds: 60
